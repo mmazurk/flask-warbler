@@ -4,15 +4,15 @@ from flask import Flask, render_template, request, flash, redirect, session, g
 from flask_debugtoolbar import DebugToolbarExtension
 from sqlalchemy.exc import IntegrityError
 
-from forms import UserAddForm, LoginForm, MessageForm
-from models import db, connect_db, User, Message
+from forms import UserAddForm, LoginForm, MessageForm, EditProfileForm
+from models import db, connect_db, User, Message, Likes
 
 import pdb
 
 CURR_USER_KEY = "curr_user"
 
 app = Flask(__name__)
-app.app_context().push() ## Mark Note: added this so I could run seed.py
+app.app_context().push()  # Mark Note: added this so I could run seed.py
 
 # Get DB_URI from environ variable (useful for production/testing) or,
 # if not set there, use development local db.
@@ -43,6 +43,7 @@ def add_user_to_g():
         g.user = None
 
 # The g object is a global object provided by Flask that is used to store data that is specific to the current request context. It's a simple way to share data between different parts of a Flask application during the processing of a single request.
+
 
 def do_login(user):
     """Log in user."""
@@ -218,7 +219,34 @@ def stop_following(follow_id):
 def profile():
     """Update profile for current user."""
 
-    # IMPLEMENT THIS
+    # Ensure a user is logged on
+    if not g.user:
+        flash("Access unauthorized.", "danger")
+        return redirect("/")
+
+    form = EditProfileForm()
+
+    if form.validate_on_submit():
+        authenticate = User.authenticate(g.user.username, g.user.password)
+        if (authenticate):
+            try:
+                g.user.username = form.username.data
+                g.user.email = form.email.data
+                g.user.image_url = form.image_url.data
+                g.user.header_image_url = form.header_image_url.data
+                g.user.bio = form.bio.data
+                db.session.add(g.user)
+                db.session.commit()
+                return redirect(f'/users/{g.user.id}')
+            except IntegrityError:
+                flash("Username already taken")
+                return render_template("users/edit.html", form=form)
+        else:
+            flash("You have entered an invalid password.", 'danger')
+            return render_template("users/edit.html", form=form)
+    else:
+        form = EditProfileForm(obj=g.user)
+        return render_template("users/edit.html", form=form)
 
 
 @app.route('/users/delete', methods=["POST"])
@@ -286,6 +314,25 @@ def messages_destroy(message_id):
     return redirect(f"/users/{g.user.id}")
 
 
+@app.route('/users/add_like/<int:message_id>', methods=["POST"])
+def messages_like(message_id):
+    """like a message"""
+
+    if not g.user:
+        flash("Access unauthorized.", "danger")
+        return redirect("/")
+
+    msg = Message.query.get(message_id)
+    if not msg.user_id == g.user.id:
+        like = Likes(user_id = g.user.id, message_id = message_id)
+        db.session.add(like)
+        db.session.commit()
+        return redirect("/")
+    else:
+        flash("You can't like your own message", "primary")
+        return redirect("/")
+
+
 ##############################################################################
 # Homepage and error pages
 
@@ -299,8 +346,12 @@ def homepage():
     """
 
     if g.user:
+        # pdb.set_trace()
+        following_ids = [u.id for u in g.user.following]
+        following_ids.append(g.user.id)
         messages = (Message
                     .query
+                    .filter(Message.user_id.in_(following_ids))
                     .order_by(Message.timestamp.desc())
                     .limit(100)
                     .all())
