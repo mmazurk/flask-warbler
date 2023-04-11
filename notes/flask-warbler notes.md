@@ -10,7 +10,7 @@ I just ended up installing all the usual packages plus the email_validator at th
 	pip install flask-bcrypt
 	pip install email_validator
 
-Rather then messing with Python version in WSL (which is difficult to do and find), I figured I would just install the latest versions and correct the code. 
+Rather then messing with Python version in WSL (which is difficult to do), I figured I would just install the latest versions and correct the code. 
 
 # Part I: Questions
 
@@ -133,8 +133,11 @@ They should be able to unlike a warble, by clicking on that star.
 
 On a profile page, it should show how many warblers that user has liked, and this should link to a page showing their liked warbles.
 
-	Mark Note: 
-	
-		You got likes handled on the database side but you will get an integrity error if you "like" something twice. This needs to be fixed.
+	Question: How do we deal with this repeating
 
-		Next: You need to pass a list of the user's likes to the jinja template and then it can check and display the correct icon and form for each item.
+	    if not g.user:
+        flash("Access unauthorized.", "danger")
+        return redirect("/")
+
+Adding the likes to the profile page was much harder than I thought but I did it.
+

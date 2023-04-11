@@ -185,6 +185,19 @@ def users_followers(user_id):
     return render_template('users/followers.html', user=user)
 
 
+@app.route('/users/<int:user_id>/likes')
+def users_likes(user_id):
+    """Show liked content of this user."""
+
+    if not g.user:
+        flash("Access unauthorized.", "danger")
+        return redirect("/")
+
+    user = User.query.get_or_404(user_id)
+    likes = user.likes
+    return render_template('/users/show_likes.html', user=user, messages=likes)
+
+
 @app.route('/users/follow/<int:follow_id>', methods=['POST'])
 def add_follow(follow_id):
     """Add a follow for the currently-logged-in user."""
@@ -324,7 +337,7 @@ def messages_like(message_id):
 
     msg = Message.query.get(message_id)
     if not msg.user_id == g.user.id:
-        like = Likes(user_id = g.user.id, message_id = message_id)
+        like = Likes(user_id=g.user.id, message_id=message_id)
         db.session.add(like)
         db.session.commit()
         return redirect("/")
@@ -332,6 +345,20 @@ def messages_like(message_id):
         flash("You can't like your own message", "primary")
         return redirect("/")
 
+
+@app.route('/users/remove_like/<int:message_id>', methods=['POST'])
+def messages_unlike(message_id):
+    """unlike a message"""
+
+    if not g.user:
+        flash("Access unauthorized.", "danger")
+        return redirect("/")
+
+    like = Likes.query.filter(Likes.message_id == message_id).first()
+    db.session.delete(like)
+    db.session.commit()
+
+    return redirect("/")
 
 ##############################################################################
 # Homepage and error pages
@@ -356,7 +383,11 @@ def homepage():
                     .limit(100)
                     .all())
 
-        return render_template('home.html', messages=messages)
+        # pdb.set_trace()
+        likes = [m.message_id for m in Likes.query.all() if m.user_id ==
+                 g.user.id]
+
+        return render_template('home.html', messages=messages, likes=likes)
 
     else:
         # pdb.set_trace()
