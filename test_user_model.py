@@ -7,7 +7,6 @@
 
 import os
 from unittest import TestCase
-
 from models import db, User, Message, Follows
 
 # BEFORE we import our app, let's set an environmental variable
@@ -26,6 +25,7 @@ from app import app
 # once for all tests --- in each test, we'll delete the data
 # and create fresh new clean test data
 
+db.drop_all()
 db.create_all()
 
 
@@ -35,24 +35,60 @@ class UserModelTestCase(TestCase):
     def setUp(self):
         """Create test client, add sample data."""
 
+        self.client = app.test_client()
+
+        u1 = User(
+            email="test1@test.com",
+            username="testuser1",
+            password="HASHED_PASSWORD1"
+        )
+        
+        u2 = User(
+            email="test2@test.com",
+            username="testuser2",
+            password="HASHED_PASSWORD2"
+        )
+
+        db.session.add_all([u1, u2])
+        db.session.commit()
+
+        # The PK id's autoincrement and change in setUp and tearDown, so I had to do this
+        # I'll check with Zak to see if this is okay 
+
+        f1 = Follows(
+            user_being_followed_id = User.query.filter(User.email=="test1@test.com").first().id,
+            user_following_id = User.query.filter(User.email=="test2@test.com").first().id  
+        )
+
+        db.session.add(f1)
+        db.session.commit()
+
+    def tearDown(self):
+        """tear down"""
+
         User.query.delete()
         Message.query.delete()
         Follows.query.delete()
 
-        self.client = app.test_client()
-
     def test_user_model(self):
         """Does basic model work?"""
 
-        u = User(
-            email="test@test.com",
-            username="testuser",
-            password="HASHED_PASSWORD"
-        )
+        user = User.query.filter(User.email == "test1@test.com").first()
+        self.assertEqual(len(user.messages), 0)
+        self.assertEqual(len(user.followers), 1)
 
-        db.session.add(u)
-        db.session.commit()
+    def test_repr_method(self):
+        """Does the __repr__ method work?"""
 
-        # User should have no messages & no followers
-        self.assertEqual(len(u.messages), 0)
-        self.assertEqual(len(u.followers), 0)
+        user = User.query.filter(User.email == "test1@test.com").first()
+        self.assertEqual(str(user), "<User #1: testuser1, test1@test.com>")
+
+    # def test_following(self):
+    #     """Test the following functionality"""
+
+    #     user1 = User.query.filter(User.email == "test1@test.com").first()
+    #     user2 = User.query.filter(User.email == "test2@test.com").first()
+    #     self.assertEqual(user1.is_followed_by(user2), True)
+    #     self.assertEqual(user2.is_followed_by(user1), False)
+
+
